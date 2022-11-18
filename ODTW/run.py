@@ -4,7 +4,44 @@ import pyaudio
 import wave
 import librosa
 import libfmp
+import numpy as np
+import matplotlib.pyplot as plt
 from OEM import ODTW
+
+
+def compute_optimal_warping_path(D):
+    """Compute the warping path given an accumulated cost matrix
+
+    Notebook: C3/C3S2_DTWbasic.ipynb
+
+    Args:
+        D (np.ndarray): Accumulated cost matrix
+
+    Returns:
+        P (np.ndarray): Optimal warping path
+    """
+    N = D.shape[0]
+    M = D.shape[1]
+    n = 0
+    m = 0
+    P = [(n, m)]
+    while n < N - 1 and m < M - 1:
+        #if n == 0:
+        #    cell = (0, m - 1)
+        #elif m == 0:
+        #    cell = (n - 1, 0)
+        #else:
+        val = min(D[n+1, m+1], D[n+1, m], D[n, m+1])
+        if val == D[n+1, m+1]:
+            cell = (n+1, m+1)
+        elif val == D[n+1, m]:
+            cell = (n+1, m)
+        else:
+            cell = (n, m+1)
+        P.append(cell)
+        (n, m) = cell
+    # P.reverse()
+    return np.array(P)
 
 sample_name = "norabang_sample.wav"
 chunk= 4409  # I don't know why but if chunk=4410, SFTF with hop size 2205 makes 3 time output 
@@ -117,7 +154,7 @@ while sec < duration * 10:
         break
     
     # Save Recorded Audio
-    frames.append(data)
+    frames.append(Y_byte)
 
     # chunk / sample_rate ~= 0.1, so each loop should take 0.1s
     sec += 1
