@@ -4,7 +4,6 @@ import pyaudio
 import wave
 import time
 import sys
-import oDTW
 
 
 if __name__ == '__main__':
@@ -18,46 +17,76 @@ if __name__ == '__main__':
     # audiofile = input("Audio File Name: ")
     # wf = wave.open(audiofile, 'rb')
 
-    # instantiate PyAudio (1)
-    p = pyaudio.PyAudio()
+    if False:
+        audiofile = "../norabang_sample.wav"
+        wf = wave.open(audiofile, 'rb')
 
-    # define callback (2)
-    def callback(in_data, frame_count, time_info, status):
-        data = wf.readframes(frame_count)
+        # instantiate PyAudio (1)
+        p = pyaudio.PyAudio()
+
+        # open stream (3)
+        stream = p.open(format=p.get_format_from_width(wf.getsampwidth()),
+                        channels=wf.getnchannels(),
+                        rate=wf.getframerate(),
+                        output=True)
+
+        data = wf.readframes(44100 * 10)
+        stream.write(data)
         print("hi")
-        return (data, pyaudio.paContinue)
 
-    input('Recording Start (Press Enter) ')
+        # stop stream (4)
+        stream.stop_stream()
+        stream.close()
 
-    # open stream using callback (3)
-    stream = p.open(format=sample_format,
-                    channels=channels,
-                    rate=fs,
-                    frames_per_buffer=chunk,
-                    input=True)
-                    #stream_callback=callback)
+        # close PyAudio (5)
+        p.terminate()
 
-    frames = []  # Initialize array to store frames
 
-    # Store data in chunks for 3 seconds
-    for i in range(0, int(fs / chunk * seconds)):
-        data = stream.read(chunk)  # data: byte format
-        frames.append(data)
 
-    print(len(frames))
-    # Stop and close the stream 
-    stream.stop_stream()
-    stream.close()
-    # Terminate the PortAudio interface
+    if True: 
+        # instantiate PyAudio (1)
+        p = pyaudio.PyAudio()
 
-    p.terminate()
+        # define callback (2)
+        def callback(in_data, frame_count, time_info, status):
+            data = wf.readframes(frame_count)
+            print("hi")
+            return (data, pyaudio.paContinue)
 
-    print('Finished recording')
+        input('Recording Start (Press Enter) ')
 
-    # Save the recorded data as a WAV file
-    wf = wave.open(filename, 'wb')
-    wf.setnchannels(channels)
-    wf.setsampwidth(p.get_sample_size(sample_format))
-    wf.setframerate(fs)
-    wf.writeframes(b''.join(frames))
-    wf.close()
+        # open stream using callback (3)
+        stream = p.open(format=sample_format,
+                        channels=channels,
+                        rate=fs,
+                        frames_per_buffer=chunk,
+                        input=True)
+                        #stream_callback=callback)
+
+        frames = []  # Initialize array to store frames
+
+        data = stream.read(44100 * 5)
+        print("hihi")
+
+        # Store data in chunks for 3 seconds
+        for i in range(0, int(fs / chunk * seconds)):
+            data = stream.read(chunk)  # data: byte format
+            frames.append(data)
+
+        print(len(frames))
+        # Stop and close the stream 
+        stream.stop_stream()
+        stream.close()
+        # Terminate the PortAudio interface
+
+        p.terminate()
+
+        print('Finished recording')
+
+        # Save the recorded data as a WAV file
+        wf = wave.open(filename, 'wb')
+        wf.setnchannels(channels)
+        wf.setsampwidth(p.get_sample_size(sample_format))
+        wf.setframerate(fs)
+        wf.writeframes(b''.join(frames))
+        wf.close()

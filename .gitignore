@@ -1,0 +1,17 @@
+/demucs/*.egg-info
+/demucs/__pycache__
+/demucs/Session.vim
+/demucs/build
+/demucs/dist
+/demucs/lab
+/demucs/metadata
+/demucs/notebooks
+/demucs/outputs
+/demucs/release
+/demucs/release_models
+/demucs/separated
+/demucs/tests
+/demucs/trash
+/demucs/misc
+/demucs/mdx
+/demucs_custom

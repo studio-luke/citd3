@@ -7,7 +7,8 @@ import libfmp
 import numpy as np
 import matplotlib.pyplot as plt
 from OEM import ODTW
-
+import time
+import sounddevice as sd
 
 def compute_optimal_warping_path(D):
     """Compute the warping path given an accumulated cost matrix
@@ -45,10 +46,11 @@ def compute_optimal_warping_path(D):
 
 sample_name = "norabang_sample.wav"
 chunk= 4409  # I don't know why but if chunk=4410, SFTF with hop size 2205 makes 3 time output 
-format=pyaudio.paFloat32
+audio_format=pyaudio.paFloat32
+timeunit = 0.1
 rate=44100
 channels=1
-
+sd.default.channels = 1
 
 acc_name = "norabang_instruments.wav"
 
@@ -65,7 +67,7 @@ accompaniment = outp.open(format=outp.get_format_from_width(acc_audio.getsampwid
 # Open Input PyAudio Stream for Recording
 inp = pyaudio.PyAudio()
 
-stream = inp.open(format=format,
+stream = inp.open(format=audio_format,
         channels=channels,
         rate=rate,
         frames_per_buffer=chunk,
@@ -104,14 +106,33 @@ scenario = ODTW(w=0.1, R=X, dist='euclidean')
 print(X.shape)
 
 # Read chunk from sample audio for oDTW initialization
-Y_byte = stream.read(chunk)
-Y_arr = np.frombuffer(Y_byte, dtype=np.float32)
+Y_arr = sd.rec(int(timeunit * rate), rate, blocking=True)
+
+"""
+cnt = 0
+for i in range(Y_arr.shape[0]):
+    if (Y_arr[i] == np.nan):
+        cnt+=1
+
+print(Y_arr, "nan:", cnt)
+"""
+
+# Y_byte = stream.read(chunk)
+# Y_int = np.frombuffer(Y_byte, dtype=np.int32)
+# Y_float32 = Y_int.astype(np.float32)
+# max_int = 2**31
+# Y_arr = Y_float32 / max_int
+# print("Y_flat32.shape:", Y_float32.shape)
+
+
 Y = librosa.feature.chroma_stft(y=Y_arr, sr=rate, tuning=0, norm=2, hop_length=H, n_fft=N)
 print(Y.shape)
 
 # Initial accompaniment play
 data = acc_audio.readframes(chunk)
-accompaniment.write(data)
+data = np.frombuffer(data, dtype=np.int32)
+sd.play(data)
+#accompaniment.write(data)
 
 # oDTW initialization
 XY = scenario.init_dist(Y)
@@ -120,12 +141,16 @@ P = compute_optimal_warping_path(D)
 print(XY.shape)
 cur = P[-1][0]  # Latest position of oDTW Alignment
 
-sec = 0
-duration = 30  # seconds
+sec = 1
+duration = 15  # seconds
 print("cur:",cur)
-while sec < duration * 10:
-    Y_byte = stream.read(chunk)  # data: byte format
-    Y_arr = np.frombuffer(Y_byte, dtype=np.float32) # byte to NParray
+start_time = time.time()
+loop = 0
+while sec < duration:
+    loop_start_time = time.time()
+    Y_arr = sd.rec(int(timeunit * rate), rate)
+    # Y_byte = stream.read(chunk)  # data: byte format
+    # Y_arr = np.frombuffer(Y_byte, dtype=np.float32) # byte to NParray
     Y = librosa.feature.chroma_stft(y=Y_arr, sr=rate, tuning=0, norm=2, hop_length=H, n_fft=N)
     col = scenario.update_dist(Y)
     XY = np.column_stack((XY, col))
@@ -138,17 +163,22 @@ while sec < duration * 10:
     
     # Update cur variable
     next_path = min(D[cur+1,-2], D[cur+1, -1], D[cur, -1])
+    
     while True:
         if next_path == D[cur+1, -1]:
             cur += 1
             data = acc_audio.readframes(chunk)
-            accompaniment.write(data)
+            data = np.frombuffer(data, dtype=np.int32)
+            sd.play(data, rate)
+            # accompaniment.write(data)
         elif next_path == D[cur, -1]:
             pass
         else:
             cur += 1
             data = acc_audio.readframes(chunk)
-            accompaniment.write(data)
+            data = np.frombuffer(data, dtype=np.int32)
+            sd.play(data, rate)
+            # accompaniment.write(data)
             next_path = min(D[cur+1,-2], D[cur+1, -1], D[cur, -1])
             continue
         break
@@ -156,11 +186,13 @@ while sec < duration * 10:
     # Save Recorded Audio
     frames.append(Y_byte)
 
+    recent_time = time.time()
     # chunk / sample_rate ~= 0.1, so each loop should take 0.1s
-    sec += 1
-    if (sec % 10 == 0):
-        print("sec: ", sec / 10.0)
-        print("cur:",cur)
+    loop += 1
+
+    if (recent_time - start_time >= sec):
+        print("sec: ", recent_time - start_time, "cur:", cur, "processed sec:", loop * chunk / rate)
+        sec += 1
 
 
 accompaniment.stop_stream()
